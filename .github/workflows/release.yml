@@ -1,6 +1,9 @@
 name: release
 
+# Run manually; tags and publishes v<mod_version> from the selected branch head.
+# Pushing a v* tag also works.
 on:
+  workflow_dispatch:
   push:
     tags: ['v*']
 
@@ -17,12 +20,19 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Check tag matches mod_version
+      - name: Resolve tag
+        id: tag
         run: |
-          v=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
-          [ "v$v" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != mod_version $v"; exit 1; }
+          v="v$(grep '^mod_version=' gradle.properties | cut -d= -f2)"
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME}" != "$v" ]; then
+            echo "tag ${GITHUB_REF_NAME} != mod_version $v"; exit 1
+          fi
+          echo "name=$v" >> "$GITHUB_OUTPUT"
       - run: chmod +x gradlew && ./gradlew build --no-daemon
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: No Summon Aggro ${{ steps.tag.outputs.name }} (NeoForge 1.21.1)
           files: build/libs/*.jar
           generate_release_notes: true
