@@ -1,8 +1,11 @@
 package io.github.hammerknife404.nosumagro;
 
 import io.redspace.ironsspellbooks.entity.mobs.IMagicSummon;
+import io.github.hammerknife404.nosumagro.network.SummonAllyPayload;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -16,8 +19,13 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Every Iron's Spells summon (and every addon summon built on {@link IMagicSummon}, e.g. Cataclysm: Spellbooks)
@@ -30,6 +38,9 @@ public final class SummonAggroHandler {
             TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(NoSummonAggro.MODID, "protected_from_summons"));
 
     private static final int CLEANUP_INTERVAL = 10;
+
+    /** Last player-owned state sent to clients per summon, so we only broadcast on change. */
+    private static final Map<Entity, Boolean> SYNCED_OWNERSHIP = new WeakHashMap<>();
 
     private SummonAggroHandler() {
     }
@@ -71,7 +82,7 @@ public final class SummonAggroHandler {
 
     /**
      * Drops a protected target that slipped in before this mod could veto it (pre-existing save data, or a
-     * brain memory written directly instead of through setTarget).
+     * brain memory written directly instead of through setTarget), and syncs player ownership to clients.
      */
     @SubscribeEvent
     public static void onEntityTick(EntityTickEvent.Post event) {
@@ -80,6 +91,7 @@ public final class SummonAggroHandler {
             return;
         }
         Player owner = playerOwner(mob);
+        syncOwnership(mob, owner != null);
         if (owner == null) {
             return;
         }
@@ -96,6 +108,33 @@ public final class SummonAggroHandler {
                     brain.eraseMemory(MemoryModuleType.ATTACK_TARGET);
                 }
             });
+        }
+    }
+
+    @SubscribeEvent
+    public static void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getTarget() instanceof IMagicSummon && event.getEntity() instanceof ServerPlayer player
+                && playerOwner(event.getTarget()) != null) {
+            send(player, new SummonAllyPayload(event.getTarget().getId(), true));
+        }
+    }
+
+    private static void syncOwnership(Mob mob, boolean playerOwned) {
+        if (SYNCED_OWNERSHIP.getOrDefault(mob, false) == playerOwned) {
+            return;
+        }
+        SYNCED_OWNERSHIP.put(mob, playerOwned);
+        var payload = new SummonAllyPayload(mob.getId(), playerOwned);
+        // Whole dimension rather than trackers: StartTracking may have fired before the owner was assigned
+        for (ServerPlayer player : ((ServerLevel) mob.level()).players()) {
+            send(player, payload);
+        }
+    }
+
+    private static void send(ServerPlayer player, SummonAllyPayload payload) {
+        // Payload is optional; sending to a client without the channel throws
+        if (player.connection.hasChannel(SummonAllyPayload.TYPE)) {
+            PacketDistributor.sendToPlayer(player, payload);
         }
     }
 
