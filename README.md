@@ -16,4 +16,6 @@ as friendly (green) when Neat's `color_by_type` is on. This needs the mod on the
 without it can still join and just keep red bars.
 
 Requires Iron's Spells 'n Spellbooks. Cataclysm: Spellbooks is optional (no compile dependency).
-Build: `./gradlew build` → `build/libs/nosumagro-<version>.jar`.
+Build: `./gradlew build` → `build/libs/nosumagro-<version>-dev.jar` (CI adds the commit; only the Release
+workflow builds a plain `nosumagro-<version>.jar`). To release, bump `mod_version` in `gradle.properties` and
+merge to `main`; the Release workflow publishes a GitHub release tagged `v<version>` with the jar.
