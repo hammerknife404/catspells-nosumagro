@@ -16,8 +16,8 @@ public final class Config {
             .define("protectFriendlies", true);
 
     public static final ModConfigSpec.BooleanValue PROTECT_PETS = BUILDER
-            .comment("Player-owned summons never target or damage tamed animals owned by a player,",
-                    "or summons owned by another player.")
+            .comment("Player-owned summons never target or damage tamed animals owned by a player (also while",
+                    "that player is offline or in another dimension), or summons owned by another player.")
             .define("protectPets", true);
 
     public static final ModConfigSpec.BooleanValue BLOCK_DAMAGE = BUILDER

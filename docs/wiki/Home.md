@@ -18,7 +18,7 @@ Those friendly entities also stop targeting player-owned summons. Summons owned 
 |---|---|
 | `protectPlayers` | Player-owned summons never target or damage other players. |
 | `protectFriendlies` | Player-owned summons never target or damage villagers, traders, golems, guards, or anything in the `#nosumagro:protected_from_summons` tag. Those entities also stop targeting player-owned summons. |
-| `protectPets` | Player-owned summons never target or damage tamed animals owned by a player, or summons owned by another player. |
+| `protectPets` | Player-owned summons never target or damage tamed animals owned by a player (also while that player is offline or in another dimension), or summons owned by another player. |
 | `blockDamage` | Also cancel damage dealt by player-owned summons to protected entities. This catches area and splash attacks that hit without targeting. |
 
 ## Protecting more mobs
