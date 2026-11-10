@@ -165,7 +165,11 @@ public final class SummonAggroHandler {
             return true;
         }
         if (Config.PROTECT_PETS.get()) {
-            if (target instanceof OwnableEntity ownable && ownable.getOwner() instanceof Player) {
+            // By owner UUID, not getOwner(): that only finds an owner who is online and in this dimension, so a
+            // pet lost its protection while its owner was away. Summons are judged by their summoner instead
+            // (ISS's summoned horse is an ownable horse too).
+            if (target instanceof OwnableEntity ownable && !(target instanceof IMagicSummon)
+                    && ownable.getOwnerUUID() != null) {
                 return true;
             }
             return playerOwner(target) != null;
