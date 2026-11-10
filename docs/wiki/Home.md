@@ -8,7 +8,7 @@ A NeoForge 1.21.1 mod for [Iron's Spells 'n Spellbooks](https://www.curseforge.c
 
 Those friendly entities also stop targeting player-owned summons. Summons owned by hostile mobs (necromancers etc.) are untouched.
 
-**Requires:** Minecraft 1.21.1, NeoForge 21.1 and Iron's Spells 'n Spellbooks 3.x. Cataclysm: Spellbooks is optional. Install it on the server, or your client for singleplayer; clients without it can still join a server that has it.
+**Requires:** Minecraft 1.21.1, NeoForge 21.1 and Iron's Spells 'n Spellbooks 3.0 or newer. Cataclysm: Spellbooks is optional. Install it on the server, or your client for singleplayer; clients without it can still join a server that has it.
 
 ## Configuration
 
