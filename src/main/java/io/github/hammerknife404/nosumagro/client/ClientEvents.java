@@ -15,6 +15,12 @@ public final class ClientEvents {
         }
     }
 
+    /** Dimension change drops the old level's entities without leave events; the server re-sends on tracking. */
+    @SubscribeEvent
+    public static void onClone(ClientPlayerNetworkEvent.Clone event) {
+        ClientSummonAllies.clear();
+    }
+
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientSummonAllies.clear();

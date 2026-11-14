@@ -25,6 +25,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.WeakHashMap;
 
 /**
@@ -42,6 +43,12 @@ public final class SummonAggroHandler {
     /** Last player-owned state sent to clients per summon, so we only broadcast on change. */
     private static final Map<Entity, Boolean> SYNCED_OWNERSHIP = new WeakHashMap<>();
 
+    /**
+     * Last player seen owning each summon. ISS's getSummoner() only finds an owner in the summon's own dimension,
+     * so a summon left behind when its owner changes dimension would otherwise turn unowned and lose protection.
+     */
+    private static final Map<Entity, UUID> LAST_PLAYER_OWNER = new WeakHashMap<>();
+
     private SummonAggroHandler() {
     }
 
@@ -53,7 +60,7 @@ public final class SummonAggroHandler {
             return;
         }
 
-        Player owner = playerOwner(entity);
+        UUID owner = playerOwner(entity);
         if (owner != null && isProtectedFrom(owner, newTarget)) {
             event.setCanceled(true);
             return;
@@ -74,7 +81,7 @@ public final class SummonAggroHandler {
         if (victim.level().isClientSide) {
             return;
         }
-        Player owner = playerOwner(event.getSource().getEntity());
+        UUID owner = playerOwner(event.getSource().getEntity());
         if (owner != null && isProtectedFrom(owner, victim)) {
             event.setCanceled(true);
         }
@@ -90,7 +97,7 @@ public final class SummonAggroHandler {
                 || mob.level().isClientSide || mob.tickCount % CLEANUP_INTERVAL != 0) {
             return;
         }
-        Player owner = playerOwner(mob);
+        UUID owner = playerOwner(mob);
         syncOwnership(mob, owner != null);
         if (owner == null) {
             return;
@@ -139,23 +146,35 @@ public final class SummonAggroHandler {
     }
 
     /**
-     * @return the player who summoned this entity, or null if it isn't a player's summon (hostile casters such
-     * as ISS necromancers keep their normal behaviour)
+     * @return the UUID of the player who summoned this entity, or null if it isn't a player's summon (hostile
+     * casters such as ISS necromancers keep their normal behaviour). Server side only.
      */
     @Nullable
-    private static Player playerOwner(@Nullable Entity entity) {
-        if (entity instanceof IMagicSummon summon && summon.getSummoner() instanceof Player player) {
-            return player;
+    private static UUID playerOwner(@Nullable Entity entity) {
+        if (!(entity instanceof IMagicSummon summon)) {
+            return null;
         }
-        return null;
+        Entity summoner = summon.getSummoner();
+        if (summoner instanceof Player player) {
+            LAST_PLAYER_OWNER.put(entity, player.getUUID());
+            return player.getUUID();
+        }
+        if (summoner != null) {
+            // Handed to a non-player owner
+            LAST_PLAYER_OWNER.remove(entity);
+            return null;
+        }
+        // Owner not in this dimension, or ISS dropped the link (e.g. owner logged out while the summon was in
+        // another dimension): keep treating it as that player's summon, the safe side for a leftover summon.
+        return LAST_PLAYER_OWNER.get(entity);
     }
 
     private static boolean isFriendly(LivingEntity entity) {
         return entity instanceof AbstractVillager || entity.getType().is(PROTECTED_FROM_SUMMONS);
     }
 
-    private static boolean isProtectedFrom(Player owner, LivingEntity target) {
-        if (target == owner) {
+    private static boolean isProtectedFrom(UUID owner, LivingEntity target) {
+        if (target.getUUID().equals(owner)) {
             return true;
         }
         if (target instanceof Player) {
