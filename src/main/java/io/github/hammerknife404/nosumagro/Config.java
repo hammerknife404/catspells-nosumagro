@@ -25,6 +25,12 @@ public final class Config {
                     "(catches AoE/splash attacks that hit without targeting).")
             .define("blockDamage", true);
 
+    public static final ModConfigSpec.BooleanValue REMOVE_ORPHANS = BUILDER
+            .comment("Unsummon a player's summon once Iron's Spells loses track of its owner (owner logged out while",
+                    "the summon was in another dimension or unloaded chunks, or a server restart). Such summons never",
+                    "expire, can't be ridden and act as wild mobs.")
+            .define("removeOrphanedSummons", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {

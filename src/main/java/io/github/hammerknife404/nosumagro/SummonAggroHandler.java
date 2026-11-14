@@ -3,6 +3,7 @@ package io.github.hammerknife404.nosumagro;
 import io.redspace.ironsspellbooks.entity.mobs.IMagicSummon;
 import io.github.hammerknife404.nosumagro.network.SummonAllyPayload;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -44,10 +45,13 @@ public final class SummonAggroHandler {
     private static final Map<Entity, Boolean> SYNCED_OWNERSHIP = new WeakHashMap<>();
 
     /**
-     * Last player seen owning each summon. ISS's getSummoner() only finds an owner in the summon's own dimension,
-     * so a summon left behind when its owner changes dimension would otherwise turn unowned and lose protection.
+     * Player who last owned a summon, in the entity's NeoForge persistent data so it survives chunk reloads,
+     * dimension changes and restarts. ISS's getSummoner() only finds an owner in the summon's own dimension, and
+     * ISS keeps the owner link in memory only.
      */
-    private static final Map<Entity, UUID> LAST_PLAYER_OWNER = new WeakHashMap<>();
+    private static final String OWNER_KEY = NoSummonAggro.MODID + ":player_owner";
+
+    private static final boolean HAS_SUMMON_MANAGER = classExists("io.redspace.ironsspellbooks.capabilities.magic.SummonManager");
 
     private SummonAggroHandler() {
     }
@@ -97,7 +101,13 @@ public final class SummonAggroHandler {
                 || mob.level().isClientSide || mob.tickCount % CLEANUP_INTERVAL != 0) {
             return;
         }
-        UUID owner = playerOwner(mob);
+        IMagicSummon summon = (IMagicSummon) mob;
+        Entity summoner = summon.getSummoner();
+        UUID owner = playerOwner(mob, summoner);
+        if (owner != null && summoner == null && Config.REMOVE_ORPHANS.get() && isOrphaned(mob, owner)) {
+            summon.onUnSummon();
+            return;
+        }
         syncOwnership(mob, owner != null);
         if (owner == null) {
             return;
@@ -151,22 +161,55 @@ public final class SummonAggroHandler {
      */
     @Nullable
     private static UUID playerOwner(@Nullable Entity entity) {
-        if (!(entity instanceof IMagicSummon summon)) {
-            return null;
-        }
-        Entity summoner = summon.getSummoner();
+        return entity instanceof IMagicSummon summon ? playerOwner(entity, summon.getSummoner()) : null;
+    }
+
+    @Nullable
+    private static UUID playerOwner(Entity entity, @Nullable Entity summoner) {
+        CompoundTag data = entity.getPersistentData();
         if (summoner instanceof Player player) {
-            LAST_PLAYER_OWNER.put(entity, player.getUUID());
-            return player.getUUID();
+            UUID id = player.getUUID();
+            if (!data.hasUUID(OWNER_KEY) || !data.getUUID(OWNER_KEY).equals(id)) {
+                data.putUUID(OWNER_KEY, id);
+            }
+            return id;
         }
         if (summoner != null) {
             // Handed to a non-player owner
-            LAST_PLAYER_OWNER.remove(entity);
+            data.remove(OWNER_KEY);
             return null;
         }
-        // Owner not in this dimension, or ISS dropped the link (e.g. owner logged out while the summon was in
-        // another dimension): keep treating it as that player's summon, the safe side for a leftover summon.
-        return LAST_PLAYER_OWNER.get(entity);
+        // Owner not in this dimension, or ISS lost the link: still that player's summon
+        return data.hasUUID(OWNER_KEY) ? data.getUUID(OWNER_KEY) : null;
+    }
+
+    /**
+     * ISS forgets a summon's owner on owner logout (it only saves the summons in the owner's dimension) and on
+     * restart. Those summons never expire, can't be ridden and act as wild mobs, so they're unsummoned. A summon
+     * still linked to an online owner in another dimension is kept.
+     */
+    private static boolean isOrphaned(Entity summon, UUID owner) {
+        if (!HAS_SUMMON_MANAGER || summon.getServer() == null) {
+            return false; // pre-SummonManager ISS: can't tell, leave it
+        }
+        ServerPlayer player = summon.getServer().getPlayerList().getPlayer(owner);
+        if (player == null) {
+            return true;
+        }
+        try {
+            return !io.redspace.ironsspellbooks.capabilities.magic.SummonManager.getSummons(player).contains(summon.getUUID());
+        } catch (LinkageError e) {
+            return false;
+        }
+    }
+
+    private static boolean classExists(String name) {
+        try {
+            Class.forName(name, false, SummonAggroHandler.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     private static boolean isFriendly(LivingEntity entity) {

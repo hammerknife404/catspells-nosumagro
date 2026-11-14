@@ -20,6 +20,7 @@ Those friendly entities also stop targeting player-owned summons. This holds whi
 | `protectFriendlies` | Player-owned summons never target or damage villagers, traders, golems, guards, or anything in the `#nosumagro:protected_from_summons` tag. Those entities also stop targeting player-owned summons. |
 | `protectPets` | Player-owned summons never target or damage tamed animals owned by a player (also while that player is offline or in another dimension), or summons owned by another player. |
 | `blockDamage` | Also cancel damage dealt by player-owned summons to protected entities. This catches area and splash attacks that hit without targeting. |
+| `removeOrphanedSummons` | Unsummon a player's summon once Iron's Spells loses track of its owner. That happens when the owner logs out while the summon is in another dimension or in unloaded chunks, and after a server restart. Such summons never expire, can't be ridden (spectral steed, polar bear) and act as wild mobs. Summons still linked to an owner who is online in another dimension are kept. |
 
 ## Protecting more mobs
 
